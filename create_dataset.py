@@ -19,7 +19,7 @@ TEST_SPLIT_RATIO = 0.15
 print(f"Loading data from '{PTH_FILE_PATH}' (assuming it's a list of (image, label) pairs)...")
 
 # TensorDataset directly wraps the image and label Tensors
-full_dataset = torch.load(PTH_FILE_PATH)
+full_dataset = torch.load(PTH_FILE_PATH, weights_only=False)
 print(f"Created a full TensorDataset with {len(full_dataset)} samples.")
 
 total_size = len(full_dataset)

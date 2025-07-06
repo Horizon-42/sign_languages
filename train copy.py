@@ -51,6 +51,24 @@ data_transforms = {
     ]),
 }
 
+# 创建ImageFolder数据集
+# 你的数据集结构应该如下：
+# hand_gestures_dataset/
+# ├── train/
+# │   ├── class_0/
+# │   │   ├── img_001.jpg
+# │   │   └── ...
+# │   ├── class_1/
+# │   │   └── ...
+# │   └── ...
+# ├── val/
+# │   ├── class_0/
+# │   │   └── ...
+# │   └── ...
+# └── test/
+#     ├── class_0/
+#     │   └── ...
+#     └── ...
 
 # 如果你的数据集没有明确的train/val/test文件夹，你需要手动划分
 # 这里假设你已经划分好了
@@ -70,10 +88,21 @@ class_names = image_datasets['train'].classes # 获取类别名称
 print(f"Dataset sizes: {dataset_sizes}")
 print(f"Class names: {class_names}")
 
-
+# --- 3. 模型构建：使用预训练的ResNet-50 ---
+# 加载预训练的ResNet-50模型
+# model_ft = models.resnet101(pretrained=True)
 model_ft = HandGestureCNN(num_classes=len(class_names))
 
+# # 冻结所有参数
+# for param in model_ft.parameters():
+#     param.requires_grad = False
 
+# # 替换全连接层 (分类头)
+# # ResNet-50的最后一个全连接层是fc
+# # 获取fc层的输入特征数
+# num_ftrs = model_ft.fc.in_features
+# # 替换为新的全连接层，输出维度为你的类别数量
+# model_ft.fc = nn.Linear(num_ftrs, NUM_CLASSES)
 
 # 将模型发送到GPU/CPU
 model_ft = model_ft.to(device)
