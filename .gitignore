@@ -1,3 +1,6 @@
 data
 hand_gestures_dataset
 *.pth
+
+__pycache__
+.vscode
