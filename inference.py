@@ -6,10 +6,12 @@ import pandas as pd
 import os
 from tqdm import tqdm # For a progress bar
 from dataset import *
-from model import HandGestureCNN
+from model import HandGestureCNN, EnhancedHandGestureCNN
+
+from utils import get_last_dir
 # --- 1. Configuration ---
 # Path to your best saved model checkpoint
-MODEL_PATH = 'runs/train/best.pt'
+MODEL_PATH = os.path.join(get_last_dir(), 'best.pt')
 INFERENCE_DATA_PATH = 'data/thws-mai-idl-ss-25-sign-language/SignLanguage_kaggle/todo.pth'
 INFERENCE_EXAMPLE_PATH = "data/thws-mai-idl-ss-25-sign-language/SignLanguage_kaggle/todo_example.pth"
 # Output CSV file path
@@ -21,24 +23,33 @@ NUM_CLASSES = 24
 # Batch size for inference (can be larger than training batch size if memory allows)
 INFERENCE_BATCH_SIZE = 64
 
-IMAGE_SIZE = 128
+IMAGE_SIZE = 224
 
 # Device to use (GPU if available, otherwise CPU)
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print(f"Using device for inference: {device}")
 
 # load the model
-model = HandGestureCNN(NUM_CLASSES, img_size=IMAGE_SIZE)
+model = EnhancedHandGestureCNN(NUM_CLASSES)
 model.load_state_dict(torch.load(MODEL_PATH))
 model.to(device)
 model.eval()
+
+# Data transform
+transform = v2.Compose(
+    [
+        v2.Lambda(max_channel),
+        v2.Normalize((0.5339,), (0.1353,)),
+        v2.Resize(size=(IMAGE_SIZE, IMAGE_SIZE)),
+    ]
+)
 
 # --- 2. Test inference accuracy through todo_example ---
 print(f"Loading inference example data from {INFERENCE_EXAMPLE_PATH}...")
 example_data = read_tensor_dataset(
     INFERENCE_EXAMPLE_PATH)
 example_dataset = SignLanguageDataset(
-    example_data, transform=v2.Resize(size=(IMAGE_SIZE, IMAGE_SIZE)))
+    example_data, transform=transform)
 example_dataloder = DataLoader(
     example_dataset, batch_size=INFERENCE_BATCH_SIZE, shuffle=False)
 example_data_size = len(example_dataset)
@@ -61,7 +72,7 @@ with torch.no_grad():  # 不计算梯度
 print(f"Loading inference data from {INFERENCE_DATA_PATH}...")
 # Create a TensorDataset for inference
 inference_dataset = SignLanguageDataset(read_tensor_dataset(
-    INFERENCE_DATA_PATH), transform=v2.Resize(size=(IMAGE_SIZE, IMAGE_SIZE)))
+    INFERENCE_DATA_PATH), transform=transform)
 inference_dataloader = DataLoader(
     inference_dataset, batch_size=64, shuffle=False)
 

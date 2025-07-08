@@ -11,8 +11,9 @@ import time
 import matplotlib.pyplot as plt
 from PIL import Image
 
-from model import HandGestureCNN, EarlyStopping
-from dataset import SignLanguageDataset, read_tensor_dataset, split_tensor_dataset, get_class_names
+from model import HandGestureCNN, EarlyStopping, EnhancedHandGestureCNN
+from dataset import SignLanguageDataset, read_tensor_dataset, split_tensor_dataset, get_class_names, max_channel
+from utils import get_next_dir
 
 import tqdm
 
@@ -22,11 +23,13 @@ NUM_CLASSES = 24                     # 手语手势的类别数量
 BATCH_SIZE = 32                      # 每次训练的批量大小
 NUM_EPOCHS = 100                      # 训练的总轮数
 LEARNING_RATE = 0.001                # 初始学习率
-TRAIN_DIR = './runs/train'  # 最佳模型保存路径
+TRAIN_DIR = get_next_dir('runs')
 IMAGE_SIZE = 128
 
 if not os.path.exists(TRAIN_DIR):
     os.makedirs(TRAIN_DIR)
+
+print(f"Training in {TRAIN_DIR}")
 
 # 检查是否有GPU可用
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -38,13 +41,24 @@ raw_data = read_tensor_dataset(
 
 label_names = get_class_names(raw_data)
 # 对数据进行分割
-train_data, val_data, test_data = split_tensor_dataset(raw_data)
+train_data, val_data, test_data = split_tensor_dataset(raw_data, val_rate=0.2)
 
 # img transform
-transform = transform = v2.Compose(
+transform = v2.Compose(
     [
-        v2.ColorJitter(contrast=0.01),  # contrast 可设置为 float 或 (min, max) 元组
-        v2.Resize(size=(IMAGE_SIZE, IMAGE_SIZE))
+        v2.ToImage(),                                 # 将张量或 PIL 转为 Image
+        v2.Grayscale(num_output_channels=1),          # 强制灰度图，忽略颜色差异
+        v2.Resize((IMAGE_SIZE, IMAGE_SIZE)),                        # 统一输入尺寸
+        v2.RandomEqualize(p=0.8),                     # 增强边缘/对比度，模拟不同照明条件
+        v2.RandomAffine(
+            degrees=15,                               # 随机旋转 ±15°
+            translate=(0.1, 0.1),                     # 水平/垂直平移 ±10%
+            scale=(0.9, 1.1),                         # 缩放 90%~110%
+            shear=10                                  # 随机错切 ±10°
+        ),
+        v2.RandomErasing(p=0.3, scale=(0.02, 0.1)),   # 模拟遮挡、手指丢失
+        v2.ToDtype(torch.float32, scale=True),        # 转为 [0,1] float32
+        v2.Normalize(mean=[0.5], std=[0.5])           # 标准化为 [-1,1]
     ]
 )
 
@@ -66,15 +80,16 @@ test_dataloader = DataLoader(
 test_data_size = len(test_dataset)
 
 
-model_ft = HandGestureCNN(num_classes=len(label_names), img_size=IMAGE_SIZE)
+model = EnhancedHandGestureCNN(
+    num_classes=len(label_names))
 
 
 # 将模型发送到GPU/CPU
-model_ft = model_ft.to(device)
+model = model.to(device)
 
 # 定义损失函数和优化器
 criterion = nn.CrossEntropyLoss()
-optimizer_ft = optim.Adam(model_ft.parameters(), lr=LEARNING_RATE)
+optimizer_ft = optim.Adam(model.parameters(), lr=LEARNING_RATE)
 
 # 定义学习率调度器：每7个epoch学习率衰减0.1
 exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=7, gamma=0.1)
@@ -200,29 +215,32 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=NUM_EPOCHS):
     plt.xlabel('Epoch')
     plt.ylabel('Accuracy')
     plt.legend()
-    plt.show()
 
+    # 保存图像
+    plt.tight_layout()
     plt.savefig(f"{TRAIN_DIR}/accuracy_curve.jpg")
 
+    plt.show()
     return model
 
 # --- 5. 开始训练 ---
 if __name__ == '__main__':
     # 运行训练函数
     print("Starting training...")
-    model_ft = train_model(model_ft, criterion, optimizer_ft, exp_lr_scheduler, num_epochs=NUM_EPOCHS)
+    model = train_model(model, criterion, optimizer_ft,
+                        exp_lr_scheduler, num_epochs=NUM_EPOCHS)
     print("Training finished.")
 
     # 可选：在测试集上评估最终模型
     print("\n--- Evaluating on Test Set ---")
-    model_ft.eval() # 设置为评估模式
+    model.eval()  # 设置为评估模式
     running_corrects = 0
     with torch.no_grad(): # 不计算梯度
         for inputs, labels in test_dataloader:
             inputs = inputs.to(device)
             labels = labels.to(device)
 
-            outputs = model_ft(inputs)
+            outputs = model(inputs)
             _, preds = torch.max(outputs, 1)
             running_corrects += torch.sum(preds == labels.data)
 

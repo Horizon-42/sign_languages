@@ -22,12 +22,19 @@ def get_class_names(data: TensorDataset) -> int:
 
 
 def split_tensor_dataset(raw_data: TensorDataset, train_rate=0.7, val_rate=0.15):
-    assert train_rate+val_rate <= 0.85  # save space for test data
     total_num = len(raw_data)
     train_num = int(total_num*train_rate)
     val_num = int(total_num*val_rate)
     test_num = total_num-train_num-val_num
     return random_split(raw_data, [train_num, val_num, test_num], generator=torch.Generator().manual_seed(42))
+
+
+# 自定义最大通道转换函数
+def max_channel(img):
+    # img_tensor = v2.ToTensor()(img)  # shape: [C, H, W]
+    max_channel_tensor = torch.max(img, dim=0)[0]  # shape: [H, W]
+    return max_channel_tensor.unsqueeze(0)  # shape: [1, H, W]
+
 
 
 class SignLanguageDataset(Dataset):
@@ -37,11 +44,10 @@ class SignLanguageDataset(Dataset):
         self.images, self.labels = raw_tensor_dataset[:]
 
         # set trans
-        trans = []
         if transform:
-            trans.append(transform)
-        trans.append(v2.Grayscale(num_output_channels=1))
-        self.transform = v2.Compose(trans)
+            self.transform = transform
+        else:
+            self.transform = lambda x: x
 
         target_trans = []
         if target_transform:

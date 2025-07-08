@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 from collections.abc import Iterable
+import os
 
 def plot_dataset(dataset, columns=6, rows=3):
     fig = plt.figure(figsize=(13, 8))
@@ -18,3 +19,18 @@ def plot_dataset(dataset, columns=6, rows=3):
         # im = img.permute(2, 1, 0).numpy
         plt.imshow(im)  # show image
     plt.show()  # finally, render the plot
+
+
+def get_last_dir(root_dir: str = 'runs', phase: str = 'train'):
+    paths = os.listdir(root_dir)
+    paths = [p for p in paths if phase in p]
+    paths = sorted(paths)
+    return os.path.join(root_dir, paths[-1])
+
+
+def get_next_dir(root_dir: str = 'runs', phase: str = 'train'):
+    paths = os.listdir(root_dir)
+    paths = [p for p in paths if phase in p]
+    paths = sorted(paths)
+
+    return os.path.join(root_dir, paths[-1][:-1] + str(len(paths)))
