@@ -6,7 +6,7 @@ import pandas as pd
 import os
 from tqdm import tqdm # For a progress bar
 from dataset import *
-from model import HandGestureCNN, EnhancedHandGestureCNN
+from model import *
 
 from utils import get_last_dir
 # --- 1. Configuration ---
@@ -23,23 +23,29 @@ NUM_CLASSES = 24
 # Batch size for inference (can be larger than training batch size if memory allows)
 INFERENCE_BATCH_SIZE = 64
 
-IMAGE_SIZE = 224
+IMAGE_SIZE = 32
 
 # Device to use (GPU if available, otherwise CPU)
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print(f"Using device for inference: {device}")
 
+print("Model path: ", MODEL_PATH)
 # load the model
-model = EnhancedHandGestureCNN(NUM_CLASSES)
-model.load_state_dict(torch.load(MODEL_PATH))
+# model = EnhancedHandGestureCNN(NUM_CLASSES)
+# model = ResNet50ForGesture(NUM_CLASSES)
+ENCODE_DIR = get_last_dir(phase='encoder')
+encoder = Encoder()
+model = ClassifierWithEncoder(
+    encoder=encoder, num_classes=NUM_CLASSES, freeze_encoder=True)
+model.load_state_dict(torch.load(MODEL_PATH, weights_only=True))
 model.to(device)
 model.eval()
 
 # Data transform
 transform = v2.Compose(
     [
-        v2.Lambda(max_channel),
-        v2.Normalize((0.5339,), (0.1353,)),
+        v2.Grayscale(),
+        # v2.Normalize((0.5339,), (0.1353,)),
         v2.Resize(size=(IMAGE_SIZE, IMAGE_SIZE)),
     ]
 )

@@ -11,9 +11,9 @@ import time
 import matplotlib.pyplot as plt
 from PIL import Image
 
-from model import HandGestureCNN, EarlyStopping, EnhancedHandGestureCNN
+from model import *
 from dataset import SignLanguageDataset, read_tensor_dataset, split_tensor_dataset, get_class_names, max_channel
-from utils import get_next_dir
+from utils import get_next_dir, EarlyStopping, get_last_dir
 
 import tqdm
 
@@ -24,7 +24,7 @@ BATCH_SIZE = 32                      # 每次训练的批量大小
 NUM_EPOCHS = 100                      # 训练的总轮数
 LEARNING_RATE = 0.001                # 初始学习率
 TRAIN_DIR = get_next_dir('runs')
-IMAGE_SIZE = 128
+IMAGE_SIZE = 32
 
 if not os.path.exists(TRAIN_DIR):
     os.makedirs(TRAIN_DIR)
@@ -80,16 +80,24 @@ test_dataloader = DataLoader(
 test_data_size = len(test_dataset)
 
 
-model = EnhancedHandGestureCNN(
-    num_classes=len(label_names))
+# model = EnhancedHandGestureCNN(
+#     num_classes=len(label_names))
+# model = ResNet50ForGesture(num_classes=len(label_names))
 
+ENCODE_DIR = get_last_dir(phase='encoder')
+encoder = Encoder()
+encoder.load_state_dict(torch.load(f"{ENCODE_DIR}/best_encoder.pth"))
+model = ClassifierWithEncoder(
+    encoder=encoder, num_classes=NUM_CLASSES, freeze_encoder=True).to(device)
 
 # 将模型发送到GPU/CPU
 model = model.to(device)
 
 # 定义损失函数和优化器
 criterion = nn.CrossEntropyLoss()
-optimizer_ft = optim.Adam(model.parameters(), lr=LEARNING_RATE)
+# already use dropout, didn't need weight_decay
+optimizer_ft = optim.Adam(
+    model.parameters(), lr=LEARNING_RATE, weight_decay=0.01)
 
 # 定义学习率调度器：每7个epoch学习率衰减0.1
 exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=7, gamma=0.1)
