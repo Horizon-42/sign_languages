@@ -5,12 +5,13 @@ from torch.utils.data import Dataset, DataLoader, TensorDataset
 import pandas as pd
 import os
 from tqdm import tqdm # For a progress bar
-
+from dataset import *
+from model import HandGestureCNN
 # --- 1. Configuration ---
 # Path to your best saved model checkpoint
-MODEL_PATH = './best_resnet101_model.pth' # <--- IMPORTANT: Update this path!
-# Path to your inference dataset (the .pth file with images to predict)
-INFERENCE_DATA_PATH = './data/thws-mai-idl-ss-25-sign-language/SignLanguage_kaggle/todo.pth' # <--- IMPORTANT: Update this path!
+MODEL_PATH = 'runs/train/best.pt'
+INFERENCE_DATA_PATH = 'data/thws-mai-idl-ss-25-sign-language/SignLanguage_kaggle/todo.pth'
+INFERENCE_EXAMPLE_PATH = "data/thws-mai-idl-ss-25-sign-language/SignLanguage_kaggle/todo_example.pth"
 # Output CSV file path
 OUTPUT_CSV_PATH = './inference_results.csv'
 
@@ -24,39 +25,51 @@ INFERENCE_BATCH_SIZE = 64
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print(f"Using device for inference: {device}")
 
-# --- 2. Load the Model ---
-print(f"Loading model from {MODEL_PATH}...")
-# Initialize the model architecture (ResNet-50 as used in training)
-model = models.resnet101(pretrained=False) # No need for pretrained weights if loading a full checkpoint
-num_ftrs = model.fc.in_features
-model.fc = nn.Linear(num_ftrs, NUM_CLASSES)
+# load the model
+model = HandGestureCNN(NUM_CLASSES)
+model.load_state_dict(torch.load(MODEL_PATH))
+model.to(device)
+model.eval()
 
-# Load the saved state_dict
-try:
-    model.load_state_dict(torch.load(MODEL_PATH, map_location=device))
-    model.to(device)
-    model.eval() # Set model to evaluation mode (disables dropout, BatchNorm updates)
-    print("Model loaded successfully and set to evaluation mode.")
-except FileNotFoundError:
-    print(f"Error: Model file not found at {MODEL_PATH}. Please check the path.")
-    exit()
-except Exception as e:
-    print(f"Error loading model state_dict: {e}")
-    exit()
+# --- 2. Test inference accuracy through todo_example ---
+print(f"Loading inference example data from {INFERENCE_EXAMPLE_PATH}...")
+example_data = read_tensor_dataset(
+    INFERENCE_EXAMPLE_PATH)
+example_dataset = SignLanguageDataset(
+    example_data, transform=v2.Resize(size=(64, 64)))
+example_dataloder = DataLoader(
+    example_dataset, batch_size=INFERENCE_BATCH_SIZE, shuffle=False)
+example_data_size = len(example_dataset)
 
-# --- 3. Load the Inference Dataset ---
+print("Starting inference test...")
+example_corrects = 0
+with torch.no_grad():  # 不计算梯度
+    for inputs, labels in example_dataloder:
+        inputs = inputs.to(device)
+        labels = labels.to(device)
+
+        outputs = model(inputs)
+        _, preds = torch.max(outputs, 1)
+        example_corrects += torch.sum(preds == labels.data)
+
+    test_acc = example_corrects.double() / example_data_size
+    print(f'Test Accuracy: {test_acc:.4f}')
+
+# --- 3. Perform Inference ---
 print(f"Loading inference data from {INFERENCE_DATA_PATH}...")
 # Create a TensorDataset for inference
-inference_dataset = torch.load(INFERENCE_DATA_PATH)
-inference_dataloader = DataLoader(inference_dataset, batch_size=INFERENCE_BATCH_SIZE, shuffle=False, num_workers=4)
+inference_dataset = SignLanguageDataset(read_tensor_dataset(
+    INFERENCE_DATA_PATH), transform=v2.Resize(size=(64, 64)))
+inference_dataloader = DataLoader(
+    inference_dataset, batch_size=64, shuffle=False)
 
-# --- 4. Perform Inference ---
 print("Starting inference...")
 predictions = []
-image_indices = []
+image_indices = range(len(inference_dataset))
+print(len(inference_dataset))
 
 with torch.no_grad(): # Disable gradient calculation for inference (saves memory, faster)
-    for i, (inputs, _) in tqdm(enumerate(inference_dataloader), total=len(inference_dataloader), desc="Predicting"):
+    for inputs, _ in tqdm(inference_dataloader):
         inputs = inputs.to(device)
 
         # Apply normalization if not already done in data loading/transform
@@ -68,11 +81,13 @@ with torch.no_grad(): # Disable gradient calculation for inference (saves memory
         _, preds = torch.max(outputs, 1) # Get the predicted class index
 
         # Store results
-        current_batch_indices = range(i * INFERENCE_BATCH_SIZE, (i * INFERENCE_BATCH_SIZE) + len(inputs))
-        image_indices.extend(current_batch_indices)
         predictions.extend(preds.cpu().tolist()) # Move to CPU and convert to Python list
 
 print("Inference complete.")
+
+predictions = [idx_to_label(lb) for lb in predictions]
+
+print(len(predictions))
 
 # --- 5. Save Results to CSV ---
 results_df = pd.DataFrame({

@@ -16,9 +16,10 @@ class HandGestureCNN(nn.Module):
         self.bn3 = nn.BatchNorm2d(64)
 
         self.dropout = nn.Dropout(0.5)
+        # image size after 3 max pool operation
         self.fc1 = nn.Linear(64*8*8, 128)
         self.fc2 = nn.Linear(128, num_classes)
-        
+
 
     def forward(self, x):
         x = self.pool(F.relu(self.bn1(self.conv1(x))))  # [B, 16, 32, 32]

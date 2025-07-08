@@ -35,13 +35,20 @@ class SignLanguageDataset(Dataset):
         super().__init__()
 
         self.images, self.labels = raw_tensor_dataset[:]
-        # self.transform = transform if transform else v2.Compose(
-        #     [v2.ToDtype(torch.float32, scale=True),
-        #      v2.Normalize(
-        #         mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
-        self.transform = transform if transform else v2.Grayscale(num_output_channels=1)
-        self.target_transform = target_transform if target_transform else Lambda(
-            lambda x: x if x <= 8 else x-1)
+
+        # set trans
+        trans = []
+        if transform:
+            trans.append(transform)
+        trans.append(v2.Grayscale(num_output_channels=1))
+        self.transform = v2.Compose(trans)
+
+        target_trans = []
+        if target_transform:
+            target_trans.append(target_transform)
+        target_trans.append(Lambda(
+            lambda x: x if x <= 8 else x-1))
+        self.target_transform = v2.Compose(target_trans)
 
     def __len__(self):
         return len(self.labels)

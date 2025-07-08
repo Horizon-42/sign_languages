@@ -4,6 +4,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 from torch.optim import lr_scheduler
 from torchvision import datasets, models, transforms
+from torchvision.transforms import v2
 import os
 import copy
 import time
@@ -13,6 +14,8 @@ from PIL import Image
 from model import HandGestureCNN
 from dataset import SignLanguageDataset, read_tensor_dataset, split_tensor_dataset, get_class_names
 
+import tqdm
+
 # --- 1. 配置参数 ---
 # 可以根据你的实际情况修改这些参数
 NUM_CLASSES = 24                     # 手语手势的类别数量
@@ -20,6 +23,9 @@ BATCH_SIZE = 32                      # 每次训练的批量大小
 NUM_EPOCHS = 25                      # 训练的总轮数
 LEARNING_RATE = 0.001                # 初始学习率
 TRAIN_DIR = './runs/train'  # 最佳模型保存路径
+
+if not os.path.exists(TRAIN_DIR):
+    os.makedirs(TRAIN_DIR)
 
 # 检查是否有GPU可用
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -33,19 +39,22 @@ label_names = get_class_names(raw_data)
 # 对数据进行分割
 train_data, val_data, test_data = split_tensor_dataset(raw_data)
 
+# img transform
+transform = v2.Resize((64, 64))
+
 train_dataset = SignLanguageDataset(
-    train_data)
+    train_data, transform=transform)
 train_dataloader = DataLoader(
     train_dataset, batch_size=BATCH_SIZE, shuffle=True)
 train_data_size = len(train_dataset)
 
 val_dataset = SignLanguageDataset(
-    val_data)
+    val_data, transform=transform)
 val_dataloader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=True)
 val_data_size = len(val_dataset)
 
 test_dataset = SignLanguageDataset(
-    test_data)
+    test_data, transform=transform)
 test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=False)
 test_data_size = len(test_dataset)
 
@@ -85,7 +94,7 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=NUM_EPOCHS):
         running_loss = 0.0
         running_corrects = 0
 
-        for inputs, labels in train_dataloader:
+        for inputs, labels in tqdm.tqdm(train_dataloader):
             inputs = inputs.to(device)
             labels = labels.to(device)
 
@@ -98,7 +107,7 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=NUM_EPOCHS):
             # backpropagation
             loss.backward()
             # update parameters
-            optimizer.setp()
+            optimizer.step()
             # statitics
             running_loss += loss.item() * inputs.size(0)
             running_corrects += torch.sum(preds == labels.data)
@@ -118,7 +127,7 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=NUM_EPOCHS):
         model.eval()
         running_loss = 0.0
         running_corrects = 0
-        for inputs, labels in val_dataloader:
+        for inputs, labels in tqdm.tqdm(val_dataloader):
             inputs = inputs.to(device)
             labels = labels.to(device)
 
