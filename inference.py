@@ -21,12 +21,14 @@ NUM_CLASSES = 24
 # Batch size for inference (can be larger than training batch size if memory allows)
 INFERENCE_BATCH_SIZE = 64
 
+IMAGE_SIZE = 128
+
 # Device to use (GPU if available, otherwise CPU)
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print(f"Using device for inference: {device}")
 
 # load the model
-model = HandGestureCNN(NUM_CLASSES)
+model = HandGestureCNN(NUM_CLASSES, img_size=IMAGE_SIZE)
 model.load_state_dict(torch.load(MODEL_PATH))
 model.to(device)
 model.eval()
@@ -36,7 +38,7 @@ print(f"Loading inference example data from {INFERENCE_EXAMPLE_PATH}...")
 example_data = read_tensor_dataset(
     INFERENCE_EXAMPLE_PATH)
 example_dataset = SignLanguageDataset(
-    example_data, transform=v2.Resize(size=(64, 64)))
+    example_data, transform=v2.Resize(size=(IMAGE_SIZE, IMAGE_SIZE)))
 example_dataloder = DataLoader(
     example_dataset, batch_size=INFERENCE_BATCH_SIZE, shuffle=False)
 example_data_size = len(example_dataset)
@@ -59,7 +61,7 @@ with torch.no_grad():  # 不计算梯度
 print(f"Loading inference data from {INFERENCE_DATA_PATH}...")
 # Create a TensorDataset for inference
 inference_dataset = SignLanguageDataset(read_tensor_dataset(
-    INFERENCE_DATA_PATH), transform=v2.Resize(size=(64, 64)))
+    INFERENCE_DATA_PATH), transform=v2.Resize(size=(IMAGE_SIZE, IMAGE_SIZE)))
 inference_dataloader = DataLoader(
     inference_dataset, batch_size=64, shuffle=False)
 

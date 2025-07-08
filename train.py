@@ -11,7 +11,7 @@ import time
 import matplotlib.pyplot as plt
 from PIL import Image
 
-from model import HandGestureCNN
+from model import HandGestureCNN, EarlyStopping
 from dataset import SignLanguageDataset, read_tensor_dataset, split_tensor_dataset, get_class_names
 
 import tqdm
@@ -20,9 +20,10 @@ import tqdm
 # 可以根据你的实际情况修改这些参数
 NUM_CLASSES = 24                     # 手语手势的类别数量
 BATCH_SIZE = 32                      # 每次训练的批量大小
-NUM_EPOCHS = 25                      # 训练的总轮数
+NUM_EPOCHS = 100                      # 训练的总轮数
 LEARNING_RATE = 0.001                # 初始学习率
 TRAIN_DIR = './runs/train'  # 最佳模型保存路径
+IMAGE_SIZE = 128
 
 if not os.path.exists(TRAIN_DIR):
     os.makedirs(TRAIN_DIR)
@@ -40,7 +41,12 @@ label_names = get_class_names(raw_data)
 train_data, val_data, test_data = split_tensor_dataset(raw_data)
 
 # img transform
-transform = v2.Resize((64, 64))
+transform = transform = v2.Compose(
+    [
+        v2.ColorJitter(contrast=0.01),  # contrast 可设置为 float 或 (min, max) 元组
+        v2.Resize(size=(IMAGE_SIZE, IMAGE_SIZE))
+    ]
+)
 
 train_dataset = SignLanguageDataset(
     train_data, transform=transform)
@@ -50,16 +56,17 @@ train_data_size = len(train_dataset)
 
 val_dataset = SignLanguageDataset(
     val_data, transform=transform)
-val_dataloader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=True)
+val_dataloader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False)
 val_data_size = len(val_dataset)
 
 test_dataset = SignLanguageDataset(
     test_data, transform=transform)
-test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=False)
+test_dataloader = DataLoader(
+    test_dataset, batch_size=BATCH_SIZE, shuffle=False)
 test_data_size = len(test_dataset)
 
 
-model_ft = HandGestureCNN(num_classes=len(label_names))
+model_ft = HandGestureCNN(num_classes=len(label_names), img_size=IMAGE_SIZE)
 
 
 # 将模型发送到GPU/CPU
@@ -71,6 +78,10 @@ optimizer_ft = optim.Adam(model_ft.parameters(), lr=LEARNING_RATE)
 
 # 定义学习率调度器：每7个epoch学习率衰减0.1
 exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=7, gamma=0.1)
+
+# early stop
+early_stopping = EarlyStopping(
+    patience=5, delta=0.001, save_path=os.path.join(TRAIN_DIR, "early_stopped.pt"))
 
 # --- 4. 训练函数 ---
 def train_model(model, criterion, optimizer, scheduler, num_epochs=NUM_EPOCHS):
@@ -125,8 +136,8 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=NUM_EPOCHS):
 
         # ===========================VAL==============================
         model.eval()
-        running_loss = 0.0
-        running_corrects = 0
+        val_loss = 0.0
+        val_corrects = 0
         for inputs, labels in tqdm.tqdm(val_dataloader):
             inputs = inputs.to(device)
             labels = labels.to(device)
@@ -137,19 +148,19 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=NUM_EPOCHS):
                 loss = criterion(outputs, labels)
 
             # 统计
-            running_loss += loss.item() * inputs.size(0)
-            running_corrects += torch.sum(preds == labels.data)
+            val_loss += loss.item() * inputs.size(0)
+            val_corrects += torch.sum(preds == labels.data)
 
-        epoch_loss = running_loss / val_data_size
-        epoch_acc = running_corrects.double() / val_data_size
+        val_epoch_loss = val_loss / val_data_size
+        val_epoch_acc = val_corrects.double() / val_data_size
 
-        print(f'Val Loss: {epoch_loss:.4f} Acc: {epoch_acc:.4f}')
+        print(f'Val Loss: {val_epoch_loss:.4f} Acc: {val_epoch_acc:.4f}')
 
-        val_losses.append(epoch_loss)
-        val_accs.append(epoch_acc.item())
+        val_losses.append(val_epoch_loss)
+        val_accs.append(val_epoch_acc.item())
 
-        if epoch_acc > best_acc:
-            best_acc = epoch_acc
+        if val_epoch_acc > best_acc:
+            best_acc = val_epoch_acc
             best_model_wts = copy.deepcopy(model.state_dict())
             torch.save(model.state_dict(), os.path.join(
                 TRAIN_DIR, "best.pt"))
@@ -157,6 +168,11 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=NUM_EPOCHS):
         # save last model
         torch.save(model.state_dict(), os.path.join(
             TRAIN_DIR, "last.pt"))
+
+        early_stopping(val_loss=val_epoch_loss, model=model)
+        if early_stopping.early_stop:
+            break
+
         print()
 
 
@@ -185,6 +201,8 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=NUM_EPOCHS):
     plt.ylabel('Accuracy')
     plt.legend()
     plt.show()
+
+    plt.savefig(f"{TRAIN_DIR}/accuracy_curve.jpg")
 
     return model
 
