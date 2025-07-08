@@ -16,6 +16,11 @@ def read_tensor_dataset(file_name: str): return torch.load(
     file_name, weights_only=False)
 
 
+def get_class_names(data: TensorDataset) -> int:
+    _, labels = data[:]
+    return sorted(list(set(labels.tolist())))
+
+
 def split_tensor_dataset(raw_data: TensorDataset, train_rate=0.7, val_rate=0.15):
     assert train_rate+val_rate <= 0.85  # save space for test data
     total_num = len(raw_data)
