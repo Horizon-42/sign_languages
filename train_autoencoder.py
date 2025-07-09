@@ -15,18 +15,14 @@ from model import AutoEncoder
 
 
 TRAIN_DIR = get_next_dir(phase='encoder')
+IMAGE_SIZE = 128
 os.makedirs(TRAIN_DIR)
 
-# 2. 数据加载（未标注图片）
-# transform = v2.Compose([
-#     v2.Resize((128, 128)),
-#     v2.Grayscale(),  # 转灰度
-#     v2.ToTensor(),
-# ])
+
 transform = v2.Compose([
-    v2.Resize((32, 32)),
-    v2.RandomRotation(10),
-    v2.RandomHorizontalFlip(),
+    v2.Resize((IMAGE_SIZE, IMAGE_SIZE)),
+    v2.RandomRotation(90),
+    v2.RandomVerticalFlip(),
     v2.RandomAffine(0, translate=(0.1, 0.1)),
     v2.Grayscale(),
     v2.ToTensor(),

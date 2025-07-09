@@ -14,8 +14,10 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 model:AutoEncoder = torch.load(os.path.join(MODEL_DIR, "best.pt"))
 
+IMAGE_SIZE = 128
+
 transform = v2.Compose([
-    v2.Resize((32, 32)),
+    v2.Resize((IMAGE_SIZE, IMAGE_SIZE)),
     v2.Grayscale(),  # 转灰度
     v2.ToTensor(),
 ])
@@ -26,9 +28,12 @@ dataloader = DataLoader(dataset, batch_size=64, shuffle=True)
 model.eval()
 sample_imgs = []
 
+todo_count = 0
+train_count = 0
 # 从 dataloader 中拿前10张图像
 with torch.no_grad():
-    for imgs, _ in dataloader:
+    for imgs, label in dataloader:
+        print(label)
         imgs = imgs.to(device)
         outputs = model(imgs)
         sample_imgs = list(zip(imgs.cpu(), outputs.cpu()))

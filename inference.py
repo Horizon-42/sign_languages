@@ -23,7 +23,7 @@ NUM_CLASSES = 24
 # Batch size for inference (can be larger than training batch size if memory allows)
 INFERENCE_BATCH_SIZE = 64
 
-IMAGE_SIZE = 32
+IMAGE_SIZE = 128
 
 # Device to use (GPU if available, otherwise CPU)
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -31,12 +31,12 @@ print(f"Using device for inference: {device}")
 
 print("Model path: ", MODEL_PATH)
 # load the model
-# model = EnhancedHandGestureCNN(NUM_CLASSES)
+model = EnhancedHandGestureCNN(NUM_CLASSES)
 # model = ResNet50ForGesture(NUM_CLASSES)
-ENCODE_DIR = get_last_dir(phase='encoder')
-encoder = Encoder()
-model = ClassifierWithEncoder(
-    encoder=encoder, num_classes=NUM_CLASSES, freeze_encoder=True)
+# ENCODE_DIR = get_last_dir(phase='encoder')
+# encoder = Encoder()
+# model = ClassifierWithEncoder(
+#     encoder=encoder, num_classes=NUM_CLASSES, freeze_encoder=True)
 model.load_state_dict(torch.load(MODEL_PATH, weights_only=True))
 model.to(device)
 model.eval()
@@ -44,11 +44,29 @@ model.eval()
 # Data transform
 transform = v2.Compose(
     [
-        v2.Grayscale(),
-        # v2.Normalize((0.5339,), (0.1353,)),
-        v2.Resize(size=(IMAGE_SIZE, IMAGE_SIZE)),
+        v2.Normalize(mean=[0.5339, 0.3282, 0.3282],
+                     std=[0.1378, 0.1967, 0.1967]),
+        v2.Lambda(max_channel),  # 输出: [1, H, W]
+        v2.Resize((IMAGE_SIZE, IMAGE_SIZE)),
     ]
 )
+# transform = v2.Compose(
+#     [
+#         v2.Lambda(max_channel),  # 输出: [1, H, W]
+#         v2.Lambda(lambda tensor: tensor.repeat(3, 1, 1)),  # 输出: [3, H, W]
+#         # v2.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.1),
+#         # v2.ToImage(),                                 # 将张量或 PIL 转为 Image
+#         v2.Resize((IMAGE_SIZE, IMAGE_SIZE)),          # 统一输入尺寸
+#         # v2.RandomEqualize(p=0.8),                     # 增强边缘/对比度，模拟不同照明条件
+#         # v2.RandomAffine(
+#         #     degrees=15,                               # 随机旋转 ±15°
+#         #     scale=(0.5, 1.5),                         # 缩放范围
+#         # ),
+#         # v2.ToDtype(torch.float32, scale=True),        # 转为 [0,1] float32
+#         v2.Normalize(mean=[0.485, 0.456, 0.406],       # ImageNet 的三通道均值
+#                      std=[0.229, 0.224, 0.225]),
+#     ]
+# )
 
 # --- 2. Test inference accuracy through todo_example ---
 print(f"Loading inference example data from {INFERENCE_EXAMPLE_PATH}...")

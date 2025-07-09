@@ -117,14 +117,15 @@ class EnhancedHandGestureCNN(nn.Module):
 
 
 class ResNet50ForGesture(nn.Module):
-    def __init__(self, num_classes):
+    def __init__(self, num_classes, freeze_backbone=False):
         super().__init__()
-        # 加载预训练的 ResNet50
+        # 加载预训练的 ResNet50（默认支持三通道输入）
         self.backbone = models.resnet50(pretrained=True)
 
-        # 修改第一个卷积层为单通道（灰度图）
-        self.backbone.conv1 = nn.Conv2d(
-            1, 64, kernel_size=7, stride=2, padding=3, bias=False)
+        # 冻结主干网络（可选）
+        if freeze_backbone:
+            for param in self.backbone.parameters():
+                param.requires_grad = False
 
         # 替换分类头
         self.backbone.fc = nn.Sequential(
@@ -133,13 +134,14 @@ class ResNet50ForGesture(nn.Module):
             nn.Dropout(0.5),
             nn.Linear(512, num_classes)
         )
+        self.backbone.fc.requires_grad_()
 
     def forward(self, x):
         return self.backbone(x)
 
 
 # 残差块：用于 encoder
-class ResidualBlock(nn.Module):
+class ResidualBlock2(nn.Module):
     def __init__(self, in_channels, out_channels, stride=1, downsample=False):
         super().__init__()
         self.conv1 = nn.Conv2d(in_channels, out_channels,
@@ -173,45 +175,61 @@ class Encoder(nn.Module):
     def __init__(self):
         super().__init__()
         self.block1 = ResidualBlock(1, 32, stride=1)
-        self.block2 = ResidualBlock(32, 64, stride=2, downsample=True)  # 16x16
-        self.block3 = ResidualBlock(64, 128, stride=2, downsample=True)  # 8x8
-        self.block4 = ResidualBlock(128, 256, stride=2, downsample=True)  # 4x4
+        self.block2 = ResidualBlock2(
+            32, 64, stride=2, downsample=True)   # 64x64
+        self.block3 = ResidualBlock2(
+            64, 128, stride=2, downsample=True)  # 32x32
+        self.block4 = ResidualBlock2(
+            128, 256, stride=2, downsample=True)  # 16x16
+        self.block5 = ResidualBlock2(
+            256, 512, stride=2, downsample=True)  # 8x8
+        self.block6 = ResidualBlock2(
+            512, 512, stride=2, downsample=True)  # 4x4
 
-        self.pool = nn.AdaptiveAvgPool2d((1, 1))  # 输出 [B, 256, 1, 1]
+        self.pool = nn.AdaptiveAvgPool2d((1, 1))  # 输出 [B, 512, 1, 1]
 
     def forward(self, x):
         x = self.block1(x)
         x = self.block2(x)
         x = self.block3(x)
         x = self.block4(x)
+        x = self.block5(x)
+        x = self.block6(x)
         x = self.pool(x)
-        return x.view(x.size(0), -1)  # [B, 256]
+        return x.view(x.size(0), -1)  # [B, 512]
+
 
 
 class Decoder(nn.Module):
     def __init__(self):
         super().__init__()
-        self.fc = nn.Linear(256, 256 * 4 * 4)
+        self.fc = nn.Linear(512, 512 * 4 * 4)
         self.deconv = nn.Sequential(
-            nn.ConvTranspose2d(256, 128, 3, stride=2,
-                               padding=1, output_padding=1),
+            nn.ConvTranspose2d(512, 256, 3, stride=2, padding=1,
+                               output_padding=1),  # 4x4 -> 8x8
             nn.ReLU(),
 
-            nn.ConvTranspose2d(128, 64, 3, stride=2,
-                               padding=1, output_padding=1),
+            nn.ConvTranspose2d(256, 128, 3, stride=2, padding=1,
+                               output_padding=1),  # 8x8 -> 16x16
             nn.ReLU(),
 
-            nn.ConvTranspose2d(64, 32, 3, stride=2,
-                               padding=1, output_padding=1),
+            nn.ConvTranspose2d(128, 64, 3, stride=2, padding=1,
+                               output_padding=1),   # 16x16 -> 32x32
             nn.ReLU(),
 
-            nn.ConvTranspose2d(32, 1, 3, stride=1, padding=1),  # output: 32x32
+            nn.ConvTranspose2d(64, 32, 3, stride=2, padding=1,
+                               output_padding=1),    # 32x32 -> 64x64
+            nn.ReLU(),
+
+            nn.ConvTranspose2d(32, 1, 3, stride=2, padding=1,
+                               output_padding=1),     # 64x64 -> 128x128
             nn.Sigmoid()
         )
 
-    def forward(self, x):  # x shape: [B, 256]
-        x = self.fc(x).view(-1, 256, 4, 4)
+    def forward(self, x):  # x shape: [B, 512]
+        x = self.fc(x).view(-1, 512, 4, 4)
         return self.deconv(x)
+
 
 
 class AutoEncoder(nn.Module):
@@ -236,10 +254,10 @@ class ClassifierWithEncoder(nn.Module):
                 param.requires_grad = False
 
         self.classifier = nn.Sequential(
-            nn.Linear(256, 128),
-            nn.ReLU(),
+            nn.Linear(512, 256),
+            nn.SiLU(),
             nn.Dropout(0.3),
-            nn.Linear(128, num_classes)
+            nn.Linear(256, num_classes)
         )
 
     def forward(self, x):

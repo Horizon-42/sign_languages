@@ -24,7 +24,7 @@ BATCH_SIZE = 32                      # 每次训练的批量大小
 NUM_EPOCHS = 100                      # 训练的总轮数
 LEARNING_RATE = 0.001                # 初始学习率
 TRAIN_DIR = get_next_dir('runs')
-IMAGE_SIZE = 32
+IMAGE_SIZE = 128
 
 if not os.path.exists(TRAIN_DIR):
     os.makedirs(TRAIN_DIR)
@@ -43,22 +43,21 @@ label_names = get_class_names(raw_data)
 # 对数据进行分割
 train_data, val_data, test_data = split_tensor_dataset(raw_data, val_rate=0.2)
 
-# img transform
 transform = v2.Compose(
     [
+        v2.Normalize(mean=[0.5339, 0.3282, 0.3282],
+                     std=[0.1378, 0.1967, 0.1967]),
+        v2.Lambda(max_channel),  # 输出: [1, H, W]
+        v2.Lambda(lambda x: 1-x),
+        # v2.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.5),
         v2.ToImage(),                                 # 将张量或 PIL 转为 Image
-        v2.Grayscale(num_output_channels=1),          # 强制灰度图，忽略颜色差异
-        v2.Resize((IMAGE_SIZE, IMAGE_SIZE)),                        # 统一输入尺寸
+        v2.Resize((IMAGE_SIZE, IMAGE_SIZE)),          # 统一输入尺寸
         v2.RandomEqualize(p=0.8),                     # 增强边缘/对比度，模拟不同照明条件
         v2.RandomAffine(
             degrees=15,                               # 随机旋转 ±15°
-            translate=(0.1, 0.1),                     # 水平/垂直平移 ±10%
-            scale=(0.9, 1.1),                         # 缩放 90%~110%
-            shear=10                                  # 随机错切 ±10°
+            scale=(0.5, 1.5),                         # 缩放范围
         ),
-        v2.RandomErasing(p=0.3, scale=(0.02, 0.1)),   # 模拟遮挡、手指丢失
         v2.ToDtype(torch.float32, scale=True),        # 转为 [0,1] float32
-        v2.Normalize(mean=[0.5], std=[0.5])           # 标准化为 [-1,1]
     ]
 )
 
@@ -80,15 +79,15 @@ test_dataloader = DataLoader(
 test_data_size = len(test_dataset)
 
 
-# model = EnhancedHandGestureCNN(
-#     num_classes=len(label_names))
-# model = ResNet50ForGesture(num_classes=len(label_names))
+model = EnhancedHandGestureCNN(
+    num_classes=len(label_names))
+# model = ResNet50ForGesture(num_classes=len(label_names), freeze_backbone=False)
 
-ENCODE_DIR = get_last_dir(phase='encoder')
-encoder = Encoder()
-encoder.load_state_dict(torch.load(f"{ENCODE_DIR}/best_encoder.pth"))
-model = ClassifierWithEncoder(
-    encoder=encoder, num_classes=NUM_CLASSES, freeze_encoder=True).to(device)
+# ENCODE_DIR = get_last_dir(phase='encoder')
+# encoder = Encoder()
+# encoder.load_state_dict(torch.load(f"{ENCODE_DIR}/best_encoder.pth"))
+# model = ClassifierWithEncoder(
+#     encoder=encoder, num_classes=NUM_CLASSES, freeze_encoder=True).to(device)
 
 # 将模型发送到GPU/CPU
 model = model.to(device)
