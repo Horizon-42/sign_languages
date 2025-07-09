@@ -31,7 +31,8 @@ print(f"Using device for inference: {device}")
 
 print("Model path: ", MODEL_PATH)
 # load the model
-model = EnhancedHandGestureCNN(NUM_CLASSES)
+model = HandGestureCNN(NUM_CLASSES, img_size=IMAGE_SIZE)
+# model = EnhancedHandGestureCNN(NUM_CLASSES)
 # model = ResNet50ForGesture(NUM_CLASSES)
 # ENCODE_DIR = get_last_dir(phase='encoder')
 # encoder = Encoder()

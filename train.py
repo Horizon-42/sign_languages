@@ -79,8 +79,8 @@ test_dataloader = DataLoader(
 test_data_size = len(test_dataset)
 
 
-model = EnhancedHandGestureCNN(
-    num_classes=len(label_names))
+model = HandGestureCNN(
+    num_classes=len(label_names), img_size=IMAGE_SIZE)
 # model = ResNet50ForGesture(num_classes=len(label_names), freeze_backbone=False)
 
 # ENCODE_DIR = get_last_dir(phase='encoder')
