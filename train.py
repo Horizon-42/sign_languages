@@ -45,18 +45,18 @@ train_data, val_data, test_data = split_tensor_dataset(raw_data, val_rate=0.2)
 
 transform = v2.Compose(
     [
-        v2.Normalize(mean=[0.5339, 0.3282, 0.3282],
-                     std=[0.1378, 0.1967, 0.1967]),
+        # v2.Normalize(mean=[0.5339, 0.3282, 0.3282],
+        #              std=[0.1378, 0.1967, 0.1967]),
         v2.Lambda(max_channel),  # 输出: [1, H, W]
         v2.Lambda(lambda x: 1-x),
-        # v2.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.5),
+        v2.Normalize([0.3992], [0.1779]),
+        # v2.ColorJitter(brightness=0.5, contrast=0.5),
         v2.ToImage(),                                 # 将张量或 PIL 转为 Image
         v2.Resize((IMAGE_SIZE, IMAGE_SIZE)),          # 统一输入尺寸
-        v2.RandomEqualize(p=0.8),                     # 增强边缘/对比度，模拟不同照明条件
-        v2.RandomAffine(
-            degrees=15,                               # 随机旋转 ±15°
-            scale=(0.5, 1.5),                         # 缩放范围
-        ),
+        # v2.RandomEqualize(p=0.8),                     # 增强边缘/对比度，模拟不同照明条件
+        # v2.RandomAffine(
+        #     degrees=15,                               # 随机旋转 ±15°
+        # ),
         v2.ToDtype(torch.float32, scale=True),        # 转为 [0,1] float32
     ]
 )
@@ -95,15 +95,15 @@ model = model.to(device)
 # 定义损失函数和优化器
 criterion = nn.CrossEntropyLoss()
 # already use dropout, didn't need weight_decay
-optimizer_ft = optim.Adam(
-    model.parameters(), lr=LEARNING_RATE, weight_decay=0.01)
+optimizer = optim.Adam(
+    model.parameters(), lr=LEARNING_RATE)
 
 # 定义学习率调度器：每7个epoch学习率衰减0.1
-exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=7, gamma=0.1)
+exp_lr_scheduler = lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.1)
 
 # early stop
 early_stopping = EarlyStopping(
-    patience=5, delta=0.001, save_path=os.path.join(TRAIN_DIR, "early_stopped.pt"))
+    patience=8, delta=0.001, save_path=os.path.join(TRAIN_DIR, "early_stopped.pt"))
 
 # --- 4. 训练函数 ---
 def train_model(model, criterion, optimizer, scheduler, num_epochs=NUM_EPOCHS):
@@ -234,7 +234,7 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=NUM_EPOCHS):
 if __name__ == '__main__':
     # 运行训练函数
     print("Starting training...")
-    model = train_model(model, criterion, optimizer_ft,
+    model = train_model(model, criterion, optimizer,
                         exp_lr_scheduler, num_epochs=NUM_EPOCHS)
     print("Training finished.")
 
