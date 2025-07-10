@@ -22,9 +22,9 @@ import tqdm
 NUM_CLASSES = 24                     # 手语手势的类别数量
 BATCH_SIZE = 32                      # 每次训练的批量大小
 NUM_EPOCHS = 100                      # 训练的总轮数
-LEARNING_RATE = 0.001                # 初始学习率
+LEARNING_RATE = 0.005                # 初始学习率
 TRAIN_DIR = get_next_dir('runs')
-IMAGE_SIZE = 128
+IMAGE_SIZE = 64
 
 if not os.path.exists(TRAIN_DIR):
     os.makedirs(TRAIN_DIR)
@@ -41,7 +41,8 @@ raw_data = read_tensor_dataset(
 
 label_names = get_class_names(raw_data)
 # 对数据进行分割
-train_data, val_data, test_data = split_tensor_dataset(raw_data, val_rate=0.2)
+train_data, val_data, test_data = split_tensor_dataset(
+    raw_data, train_rate=0.8, val_rate=0.15)
 
 transform = v2.Compose(
     [
@@ -50,13 +51,13 @@ transform = v2.Compose(
         v2.Lambda(max_channel),  # 输出: [1, H, W]
         v2.Lambda(lambda x: 1-x),
         v2.Normalize([0.3992], [0.1779]),
-        # v2.ColorJitter(brightness=0.5, contrast=0.5),
+        v2.ColorJitter(brightness=0.5, contrast=0.5),
         v2.ToImage(),                                 # 将张量或 PIL 转为 Image
         v2.Resize((IMAGE_SIZE, IMAGE_SIZE)),          # 统一输入尺寸
         # v2.RandomEqualize(p=0.8),                     # 增强边缘/对比度，模拟不同照明条件
-        # v2.RandomAffine(
-        #     degrees=15,                               # 随机旋转 ±15°
-        # ),
+        v2.RandomAffine(
+            degrees=15,                               # 随机旋转 ±15°
+        ),
         v2.ToDtype(torch.float32, scale=True),        # 转为 [0,1] float32
     ]
 )
@@ -81,6 +82,8 @@ test_data_size = len(test_dataset)
 
 model = HandGestureCNN(
     num_classes=len(label_names), img_size=IMAGE_SIZE)
+model = EnhancedHandGestureCNN(
+    num_classes=len(label_names))
 # model = ResNet50ForGesture(num_classes=len(label_names), freeze_backbone=False)
 
 # ENCODE_DIR = get_last_dir(phase='encoder')
