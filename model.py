@@ -69,7 +69,7 @@ class ResidualBlock(nn.Module):
 class EnhancedHandGestureCNN(nn.Module):
     def __init__(self, num_classes, input_size=(64, 64)):
         super().__init__()
-        C = 32  # 初始通道数
+        C = 64  # 初始通道数
 
         self.stage1 = nn.Sequential(
             nn.Conv2d(1, C, kernel_size=3, padding=1),
@@ -105,9 +105,9 @@ class EnhancedHandGestureCNN(nn.Module):
         self.classifier = nn.Sequential(
             nn.Flatten(),
             nn.Dropout(0.5),
-            nn.Linear(C*8, 128),
+            nn.Linear(C*8, 256),
             nn.SiLU(),
-            nn.Linear(128, num_classes)
+            nn.Linear(256, num_classes)
         )
 
     def forward(self, x):

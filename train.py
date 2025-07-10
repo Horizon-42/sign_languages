@@ -20,7 +20,7 @@ import tqdm
 # --- 1. 配置参数 ---
 # 可以根据你的实际情况修改这些参数
 NUM_CLASSES = 24                     # 手语手势的类别数量
-BATCH_SIZE = 32                      # 每次训练的批量大小
+BATCH_SIZE = 320                      # 每次训练的批量大小
 NUM_EPOCHS = 100                      # 训练的总轮数
 LEARNING_RATE = 0.005                # 初始学习率
 TRAIN_DIR = get_next_dir('runs')
@@ -46,17 +46,15 @@ train_data, val_data, test_data = split_tensor_dataset(
 
 transform = v2.Compose(
     [
-        # v2.Normalize(mean=[0.5339, 0.3282, 0.3282],
-        #              std=[0.1378, 0.1967, 0.1967]),
         v2.Lambda(max_channel),  # 输出: [1, H, W]
         v2.Lambda(lambda x: 1-x),
         v2.Normalize([0.3992], [0.1779]),
-        # v2.ColorJitter(brightness=0.5, contrast=0.5),
+        v2.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5),
         v2.ToImage(),                                 # 将张量或 PIL 转为 Image
         v2.Resize((IMAGE_SIZE, IMAGE_SIZE)),          # 统一输入尺寸
-        # v2.RandomEqualize(p=0.8),                     # 增强边缘/对比度，模拟不同照明条件
+        v2.RandomEqualize(p=0.8),                     # 增强边缘/对比度，模拟不同照明条件
         v2.RandomAffine(
-            degrees=15,                               # 随机旋转 ±15°
+            degrees=20,                               # 随机旋转 ±15°
         ),
         v2.ToDtype(torch.float32, scale=True),        # 转为 [0,1] float32
     ]
