@@ -51,7 +51,7 @@ transform = v2.Compose(
         v2.Lambda(max_channel),  # 输出: [1, H, W]
         v2.Lambda(lambda x: 1-x),
         v2.Normalize([0.3992], [0.1779]),
-        v2.ColorJitter(brightness=0.5, contrast=0.5),
+        # v2.ColorJitter(brightness=0.5, contrast=0.5),
         v2.ToImage(),                                 # 将张量或 PIL 转为 Image
         v2.Resize((IMAGE_SIZE, IMAGE_SIZE)),          # 统一输入尺寸
         # v2.RandomEqualize(p=0.8),                     # 增强边缘/对比度，模拟不同照明条件
@@ -80,17 +80,10 @@ test_dataloader = DataLoader(
 test_data_size = len(test_dataset)
 
 
-model = HandGestureCNN(
-    num_classes=len(label_names), img_size=IMAGE_SIZE)
+# model = HandGestureCNN(
+#     num_classes=len(label_names))
 model = EnhancedHandGestureCNN(
     num_classes=len(label_names))
-# model = ResNet50ForGesture(num_classes=len(label_names), freeze_backbone=False)
-
-# ENCODE_DIR = get_last_dir(phase='encoder')
-# encoder = Encoder()
-# encoder.load_state_dict(torch.load(f"{ENCODE_DIR}/best_encoder.pth"))
-# model = ClassifierWithEncoder(
-#     encoder=encoder, num_classes=NUM_CLASSES, freeze_encoder=True).to(device)
 
 # 将模型发送到GPU/CPU
 model = model.to(device)

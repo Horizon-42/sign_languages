@@ -8,14 +8,18 @@ from tqdm import tqdm # For a progress bar
 from dataset import *
 from model import *
 
-from utils import get_last_dir
+from utils import get_last_dir, get_next_dir
 # --- 1. Configuration ---
 # Path to your best saved model checkpoint
 MODEL_PATH = os.path.join(get_last_dir(), 'best.pt')
 INFERENCE_DATA_PATH = 'data/thws-mai-idl-ss-25-sign-language/SignLanguage_kaggle/todo.pth'
 INFERENCE_EXAMPLE_PATH = "data/thws-mai-idl-ss-25-sign-language/SignLanguage_kaggle/todo_example.pth"
+
+INFERENCE_DIR = get_next_dir("runs", "inference")
+os.makedirs(INFERENCE_DIR)
+
 # Output CSV file path
-OUTPUT_CSV_PATH = './inference_results.csv'
+OUTPUT_CSV_PATH = f'./{INFERENCE_DIR}/results.csv'
 
 # Number of classes your model was trained on
 NUM_CLASSES = 24
@@ -23,7 +27,7 @@ NUM_CLASSES = 24
 # Batch size for inference (can be larger than training batch size if memory allows)
 INFERENCE_BATCH_SIZE = 64
 
-IMAGE_SIZE = 128
+IMAGE_SIZE = 64
 
 # Device to use (GPU if available, otherwise CPU)
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -31,8 +35,8 @@ print(f"Using device for inference: {device}")
 
 print("Model path: ", MODEL_PATH)
 # load the model
-model = HandGestureCNN(NUM_CLASSES, img_size=IMAGE_SIZE)
-# model = EnhancedHandGestureCNN(NUM_CLASSES)
+# model = HandGestureCNN(NUM_CLASSES, img_size=IMAGE_SIZE)
+model = EnhancedHandGestureCNN(NUM_CLASSES)
 # model = ResNet50ForGesture(NUM_CLASSES)
 # ENCODE_DIR = get_last_dir(phase='encoder')
 # encoder = Encoder()
