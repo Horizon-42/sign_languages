@@ -57,8 +57,78 @@ Because the img of todo.pth is inverted, we need to invert img in trian dataset.
 Normally we don't add transform for labels.
 
 ## 3. Model
-We try on two model.
-### 3.1 Simple Convlution
+
+### 3.0 Main Layers Used
+#### 3.0.1 Conv2d Layer
+In deep learning, 2D convolution is a fundamental operation used in convolutional neural networks (CNNs) to extract spatial features from images. A small matrix called a kernel or filter slides over the input image and performs an element-wise multiplication and summation, producing a feature map.
+
+This operation captures local patterns such as edges, corners, or textures, making it essential for tasks like image classification, object detection, and segmentation.
+
+$$
+Y(i, j) = \sum_{m=0}^{k_h - 1} \sum_{n=0}^{k_w - 1} I(i + m, j + n) \cdot K(m, n)
+$$
+
+- I: input image
+- K: convolution kernel
+- Y: output feature map
+- i,j: spatial location in the output.
+The parameters we learn in convolution layer is the **kernel matrix K**.
+
+#### 3.0.2 BatchNorm2d Layer
+BatchNorm2d is a type of Batch Normalization layer used in convolutional neural networks (CNNs) for 2D image inputs (i.e., tensors with shape [N, C, H, W], where N is batch size, C is channels, H is height, and W is width).
+
+It normalizes each channel across the batch, **stabilizing and accelerating** training by reducing internal covariate shift.
+
+Batch normalization for 2D CNNs normalizes each channel across the batch:
+
+$$
+\hat{x}_i = \frac{x_i - \mu_B}{\sqrt{\sigma_B^2 + \varepsilon}}
+$$
+
+Then applies scale and shift:
+
+$$
+y_i = \gamma \hat{x}_i + \beta
+$$
+
+Where \( \mu_B \) and \( \sigma_B^2 \) are the mean and variance of the mini-batch, and \( \gamma \), \( \beta \) are learnable parameters.
+
+
+#### 3.0.3 ReLu, SiLu
+The SiLU activation function is defined as:
+
+$$
+\text{SiLU}(x) = x \cdot \sigma(x) = \frac{x}{1 + e^{-x}}
+$$
+
+where \( \sigma(x) \) is the sigmoid function.
+
+- It smoothly combines linearity and non-linearity.
+- It can outperform ReLU in some deep learning tasks because it avoids zero gradients for negative inputs.
+- It is differentiable everywhere, which helps gradient-based optimization.
+![alt text](image.png)
+#### 3.0.4 Residual Block
+Combine conv2d, batchnorm and pool layers as a block, but add shotcut from input to output.
+```python
+class ResidualBlock(nn.Module):
+    """Basic Residual Block：Conv -> BN -> ReLU -> Conv -> BN + Skip Connection"""
+
+    def __init__(self, channels):
+        super().__init__()
+        self.conv1 = nn.Conv2d(channels, channels, kernel_size=3, padding=1)
+        self.bn1 = nn.BatchNorm2d(channels)
+        self.conv2 = nn.Conv2d(channels, channels, kernel_size=3, padding=1)
+        self.bn2 = nn.BatchNorm2d(channels)
+
+    def forward(self, x):
+        identity = x
+        out = F.silu(self.bn1(self.conv1(x)))
+        out = self.bn2(self.conv2(out))
+        out += identity # Skip Connection
+        return F.silu(out)
+```
+
+### 3.1 Model 1, Simple Convlution
 **HandGestureCNN**
 ```
 ==========================================================================================
@@ -95,7 +165,7 @@ Params size (MB): 1.72
 Estimated Total Size (MB): 3.77
 ==========================================================================================
 ```
-### 3.2 Convlution with Residual Block
+### 3.2 Model 2, Convlution with Residual Block
 **EnhancedHandGestureCNN**
 ```
 ==========================================================================================

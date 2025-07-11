@@ -49,7 +49,7 @@ class HandGestureCNN(nn.Module):
 
 
 class ResidualBlock(nn.Module):
-    """基础残差模块：Conv -> BN -> ReLU -> Conv -> BN + 跳跃连接"""
+    """Basic Residual Block：Conv -> BN -> ReLU -> Conv -> BN + Skip Connection"""
 
     def __init__(self, channels):
         super().__init__()
