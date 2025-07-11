@@ -15,10 +15,10 @@ MODEL_PATH = os.path.join(get_last_dir(), 'best.pt')
 INFERENCE_DATA_PATH = 'data/thws-mai-idl-ss-25-sign-language/SignLanguage_kaggle/todo.pth'
 INFERENCE_EXAMPLE_PATH = "data/thws-mai-idl-ss-25-sign-language/SignLanguage_kaggle/todo_example.pth"
 
-INFERENCE_DIR = get_next_dir("runs", "inference")
-os.makedirs(INFERENCE_DIR)
 
 # Output CSV file path
+INFERENCE_DIR = get_next_dir("runs", "inference")
+os.makedirs(INFERENCE_DIR)
 OUTPUT_CSV_PATH = f'./{INFERENCE_DIR}/results.csv'
 
 # Number of classes your model was trained on
@@ -37,11 +37,6 @@ print("Model path: ", MODEL_PATH)
 # load the model
 # model = HandGestureCNN(NUM_CLASSES, img_size=IMAGE_SIZE)
 model = EnhancedHandGestureCNN(NUM_CLASSES)
-# model = ResNet50ForGesture(NUM_CLASSES)
-# ENCODE_DIR = get_last_dir(phase='encoder')
-# encoder = Encoder()
-# model = ClassifierWithEncoder(
-#     encoder=encoder, num_classes=NUM_CLASSES, freeze_encoder=True)
 model.load_state_dict(torch.load(MODEL_PATH, weights_only=True))
 model.to(device)
 model.eval()
@@ -51,7 +46,7 @@ transform = v2.Compose(
     [
         v2.Grayscale(),
         v2.Normalize(mean=[0.3896],
-                     std=[0.1755]),
+                     std=[0.1755]),  # also normalize
         v2.Resize((IMAGE_SIZE, IMAGE_SIZE)),
     ]
 )
@@ -97,11 +92,6 @@ with torch.no_grad(): # Disable gradient calculation for inference (saves memory
     for inputs, _ in tqdm(inference_dataloader):
         inputs = inputs.to(device)
 
-        # Apply normalization if not already done in data loading/transform
-        # If your 'all_images' are already 0-1 float, apply standard normalization here
-        # normalize_transform = transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-        # inputs = normalize_transform(inputs)
-
         outputs = model(inputs)
         _, preds = torch.max(outputs, 1) # Get the predicted class index
 
@@ -110,6 +100,7 @@ with torch.no_grad(): # Disable gradient calculation for inference (saves memory
 
 print("Inference complete.")
 
+# !!! convert label bigger than 9 back
 predictions = [idx_to_label(lb) for lb in predictions]
 
 print(len(predictions))

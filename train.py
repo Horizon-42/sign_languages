@@ -17,13 +17,12 @@ from utils import get_next_dir, EarlyStopping, get_last_dir
 
 import tqdm
 
-# --- 1. 配置参数 ---
-# 可以根据你的实际情况修改这些参数
-NUM_CLASSES = 24                     # 手语手势的类别数量
-BATCH_SIZE = 320                      # 每次训练的批量大小
-NUM_EPOCHS = 100                      # 训练的总轮数
-LEARNING_RATE = 0.005                # 初始学习率
-TRAIN_DIR = get_next_dir('runs')
+# --- 1. Config Arguments ---
+NUM_CLASSES = 24
+BATCH_SIZE = 320
+NUM_EPOCHS = 100
+LEARNING_RATE = 0.005
+TRAIN_DIR = get_next_dir('runs')  # get the dir for new training
 IMAGE_SIZE = 64
 
 if not os.path.exists(TRAIN_DIR):
@@ -31,32 +30,38 @@ if not os.path.exists(TRAIN_DIR):
 
 print(f"Training in {TRAIN_DIR}")
 
-# 检查是否有GPU可用
+# Check if you have gpu
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
-# 读取数据
+# read data
 raw_data = read_tensor_dataset(
     "data/thws-mai-idl-ss-25-sign-language/SignLanguage_kaggle/old_annotated.pth")
 
 label_names = get_class_names(raw_data)
-# 对数据进行分割
+# split data
 train_data, val_data, test_data = split_tensor_dataset(
     raw_data, train_rate=0.8, val_rate=0.15)
 
 transform = v2.Compose(
     [
-        v2.Lambda(max_channel),  # 输出: [1, H, W]
+        # ouput: [1, H, W], get the channel with max intensity
+        v2.Lambda(max_channel),
         v2.Lambda(lambda x: 1-x),
+        # normalize, ouput = (input-mean)/std, make it zero mean and unit std
         v2.Normalize([0.3992], [0.1779]),
-        v2.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5),
-        v2.ToImage(),                                 # 将张量或 PIL 转为 Image
-        v2.Resize((IMAGE_SIZE, IMAGE_SIZE)),          # 统一输入尺寸
-        v2.RandomEqualize(p=0.8),                     # 增强边缘/对比度，模拟不同照明条件
+
+        v2.ToImage(),                                 # convert tensor to image
+        # random change brightness, contrast, and saturation
+        # change the brightness and contrast
+        v2.ColorJitter(brightness=0.5, contrast=0.5),
+        v2.Resize((IMAGE_SIZE, IMAGE_SIZE)),          # resize
+        # enhance contrast, nonlinear
+        v2.RandomEqualize(p=0.8),
         v2.RandomAffine(
-            degrees=20,                               # 随机旋转 ±15°
+            degrees=20,                               # random rotation
         ),
-        v2.ToDtype(torch.float32, scale=True),        # 转为 [0,1] float32
+        v2.ToDtype(torch.float32, scale=True),        # convert to tensenor
     ]
 )
 
@@ -83,28 +88,29 @@ test_data_size = len(test_dataset)
 model = EnhancedHandGestureCNN(
     num_classes=len(label_names))
 
-# 将模型发送到GPU/CPU
+# set model device
 model = model.to(device)
 
-# 定义损失函数和优化器
+# lossfunc
 criterion = nn.CrossEntropyLoss()
-# already use dropout, didn't need weight_decay
+# optimizer, already use dropout, didn't need weight_decay
 optimizer = optim.Adam(
     model.parameters(), lr=LEARNING_RATE)
 
-# 定义学习率调度器：每7个epoch学习率衰减0.1
+# set lr_scheduler, lr = lr * gamma^(epoch//7)
 exp_lr_scheduler = lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.1)
 
 # early stop
 early_stopping = EarlyStopping(
     patience=8, delta=0.001, save_path=os.path.join(TRAIN_DIR, "early_stopped.pt"))
 
-# --- 4. 训练函数 ---
+# --- 4. train function ---
 def train_model(model, criterion, optimizer, scheduler, num_epochs=NUM_EPOCHS):
-    since = time.time() # 记录训练开始时间
+    since = time.time()  # record start time
 
-    best_model_wts = copy.deepcopy(model.state_dict()) # 复制当前模型状态作为最佳状态
-    best_acc = 0.0 # 记录最佳验证准确率
+    # copy the intial model weights
+    best_model_wts = copy.deepcopy(model.state_dict())
+    best_acc = 0.0  # best acc acuracy
 
     train_losses = []
     val_losses = []
@@ -160,10 +166,10 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=NUM_EPOCHS):
 
             with torch.no_grad():
                 outputs = model(inputs)
-                _, preds = torch.max(outputs, 1)  # 获取预测类别
+                # get class have biggest liklihood
+                _, preds = torch.max(outputs, 1)
                 loss = criterion(outputs, labels)
 
-            # 统计
             val_loss += loss.item() * inputs.size(0)
             val_corrects += torch.sum(preds == labels.data)
 
@@ -196,10 +202,10 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=NUM_EPOCHS):
     print(f'Training complete in {time_elapsed // 60:.0f}m {time_elapsed % 60:.0f}s')
     print(f'Best val Acc: {best_acc:.4f}')
 
-    # 加载最佳模型权重
+    # load best weights
     model.load_state_dict(best_model_wts)
 
-    # 绘制训练曲线
+    # draw train curve
     plt.figure(figsize=(12, 5))
     plt.subplot(1, 2, 1)
     plt.plot(train_losses, label='Train Loss')
@@ -224,19 +230,18 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=NUM_EPOCHS):
     plt.show()
     return model
 
-# --- 5. 开始训练 ---
 if __name__ == '__main__':
-    # 运行训练函数
+    # run training
     print("Starting training...")
     model = train_model(model, criterion, optimizer,
                         exp_lr_scheduler, num_epochs=NUM_EPOCHS)
     print("Training finished.")
 
-    # 可选：在测试集上评估最终模型
+    # test model on test dataset
     print("\n--- Evaluating on Test Set ---")
-    model.eval()  # 设置为评估模式
+    model.eval()  # set to evaluation, close dropout...
     running_corrects = 0
-    with torch.no_grad(): # 不计算梯度
+    with torch.no_grad():  # don't compute gradient
         for inputs, labels in test_dataloader:
             inputs = inputs.to(device)
             labels = labels.to(device)

@@ -13,9 +13,9 @@ class EarlyStopping:
     def __init__(self, patience=5, delta=0.0, save_path=None):
         """
         Args:
-            patience (int): 容忍验证集 loss 多轮不下降的次数
-            delta (float): 能接受的最小 loss 改善值
-            save_path (str): 如果不为 None，会在每次验证 loss 改善时保存模型
+            patience (int): times you tolerant loss didn't change
+            delta (float): lowest change(better) of loss
+            save_path (str): save model if it isn't None
         """
         self.patience = patience
         self.delta = delta
@@ -40,7 +40,8 @@ class EarlyStopping:
             if self.save_path:
                 torch.save(model.state_dict(), self.save_path)
 
-def plot_dataset(dataset, columns=6, rows=3):
+
+def plot_dataset(dataset, columns=6, rows=3, cmap=None):
     fig = plt.figure(figsize=(13, 8))
 
     # ax enables access to manipulate each of subplots
@@ -55,7 +56,7 @@ def plot_dataset(dataset, columns=6, rows=3):
         # rearrage the chanel order
         im = img.permute(1, 2, 0).numpy()
         # im = img.permute(2, 1, 0).numpy
-        plt.imshow(im)  # show image
+        plt.imshow(im, cmap=cmap)  # show image
     plt.show()  # finally, render the plot
 
 
