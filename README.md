@@ -59,6 +59,7 @@ Normally we don't add transform for labels.
 ## 3. Model
 We try on two model.
 ### 3.1 Simple Convlution
+**HandGestureCNN**
 ```
 ==========================================================================================
 Layer (type:depth-idx)                   Output Shape              Param #
@@ -95,7 +96,7 @@ Estimated Total Size (MB): 3.77
 ==========================================================================================
 ```
 ### 3.2 Convlution with Residual Block
-****
+**EnhancedHandGestureCNN**
 ```
 ==========================================================================================
 Layer (type:depth-idx)                   Output Shape              Param #
@@ -155,5 +156,58 @@ Estimated Total Size (MB): 42.06
 ==========================================================================================
 ```
 ## 4. Train
+### 4.1 Dataset init
+1. Split annotated dataset to train, val and test with proportion 0.8, 0.15, 0.5.
+2. Define and apply the transform of img.
+### 4.2 Model Init
+Init Model, slect from those two model design. The enhanced one works better.
+Deeper network has more ablility to generlize.
+### 4.3 Loss Function
+**CrossEntropyLoss**
+$$
+\mathcal{L} = -\log\left(\frac{e^{z_y}}{\sum_{j=1}^{C} e^{z_j}}\right) = -z_y + \log\left( \sum_{j=1}^{C} e^{z_j} \right)
+$$
+### 4.3 Optimizer
+```python
+# optimizer, already use dropout, didn't need weight_decay
+optimizer = optim.Adam(
+    model.parameters(), lr=LEARNING_RATE)
+```
+Update parameters with learning rate.
+
+### 4.4 Learning Rate Schedule
+```
+# set lr_scheduler, lr = lr * gamma^(epoch//7)
+exp_lr_scheduler = lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.1)
+```
+Reduce learning rate every 7 epoch.
+
+### 4.5 Validation and save best model
+Keep tracking the best accuracy and save the model with best performance.
+
+### 4.6 Early Stop Machnism
+Stop learning after the loss didn't change for several times.
+See detals in class EarlyStopping, utils.py.
 
 ## 5. Inference and Submission
+Run model on todo.pth.
+inference.py
+### 5.1 Transform for todo dataset.
+```
+transform = v2.Compose(
+    [
+        v2.Grayscale(),
+        v2.Normalize(mean=[0.3896],
+                     std=[0.1755]),  # also normalize
+        v2.Resize((IMAGE_SIZE, IMAGE_SIZE)),
+    ]
+)
+```
+Only make image grayscale, and normalize it.
+### Post process of label
+```python
+def idx_to_label(x: int): return x if x <= 8 else x+1
+
+predictions = [idx_to_label(lb) for lb in predictions]
+```
+Add 1 if the label is bigger than 8.
