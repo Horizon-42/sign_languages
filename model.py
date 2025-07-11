@@ -67,9 +67,9 @@ class ResidualBlock(nn.Module):
 
 
 class EnhancedHandGestureCNN(nn.Module):
-    def __init__(self, num_classes, input_size=(64, 64)):
+    def __init__(self, num_classes):
         super().__init__()
-        C = 64  # 初始通道数
+        C = 64  # initial channels
 
         self.stage1 = nn.Sequential(
             nn.Conv2d(1, C, kernel_size=3, padding=1),
