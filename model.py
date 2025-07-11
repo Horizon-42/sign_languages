@@ -109,7 +109,7 @@ class EnhancedHandGestureCNN(nn.Module):
 
         self.classifier = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(C*16, 256),
+            nn.Linear(C*8, 256),
             nn.SiLU(),
             # key fix, should dropout after first full connection layer and after the activation layer
             nn.Dropout(0.5),
