@@ -141,7 +141,7 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=NUM_EPOCHS):
             loss.backward()
             # update parameters
             optimizer.step()
-            # statitics
+            # statitics; loss.item() returns the average loss per sample;
             running_loss += loss.item() * inputs.size(0)
             running_corrects += torch.sum(preds == labels.data)
 
