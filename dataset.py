@@ -20,7 +20,7 @@ def get_class_names(data: TensorDataset) -> int:
     _, labels = data[:]
     return sorted(list(set(labels.tolist())))
 
-
+# Use random split
 def split_tensor_dataset(raw_data: TensorDataset, train_rate=0.7, val_rate=0.15):
     total_num = len(raw_data)
     train_num = int(total_num*train_rate)
@@ -29,9 +29,8 @@ def split_tensor_dataset(raw_data: TensorDataset, train_rate=0.7, val_rate=0.15)
     return random_split(raw_data, [train_num, val_num, test_num], generator=torch.Generator().manual_seed(42))
 
 
-# 自定义最大通道转换函数
+# get max channel of a img
 def max_channel(img):
-    # img_tensor = v2.ToTensor()(img)  # shape: [C, H, W]
     max_channel_tensor = torch.max(img, dim=0)[0]  # shape: [H, W]
     return max_channel_tensor.unsqueeze(0)  # shape: [1, H, W]
 
