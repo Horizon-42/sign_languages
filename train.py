@@ -17,6 +17,10 @@ from utils import get_next_dir, EarlyStopping, get_last_dir
 
 import tqdm
 
+# create runs dir
+if not os.path.exists('runs'):
+    os.mkdir('runs')
+
 # --- 1. Config Arguments ---
 NUM_CLASSES = 24
 BATCH_SIZE = 320
