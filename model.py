@@ -53,17 +53,19 @@ class ResidualBlock(nn.Module):
 
     def __init__(self, channels):
         super().__init__()
-        self.conv1 = nn.Conv2d(channels, channels, kernel_size=3, padding=1)
-        self.bn1 = nn.BatchNorm2d(channels)
-        self.conv2 = nn.Conv2d(channels, channels, kernel_size=3, padding=1)
-        self.bn2 = nn.BatchNorm2d(channels)
+
+        # Pre activation Resnet
+        self.net = nn.Sequential(
+            nn.BatchNorm2d(channels),
+            nn.SiLU(),
+            nn.Conv2d(channels, channels, kernel_size=3, padding=1),
+            nn.BatchNorm2d(channels),
+            nn.SiLU(),
+            nn.Conv2d(channels, channels, kernel_size=3, padding=1),
+        )
 
     def forward(self, x):
-        identity = x
-        out = F.silu(self.bn1(self.conv1(x)))
-        out = self.bn2(self.conv2(out))
-        out += identity
-        return F.silu(out)
+        return x + self.net(x)
 
 
 class EnhancedHandGestureCNN(nn.Module):
@@ -84,6 +86,7 @@ class EnhancedHandGestureCNN(nn.Module):
             nn.SiLU(),
             nn.MaxPool2d(2, 2),  # -> (C*2, 16, 16)
             ResidualBlock(C*2),
+            ResidualBlock(C*2),
         )
 
         self.stage3 = nn.Sequential(
@@ -92,6 +95,7 @@ class EnhancedHandGestureCNN(nn.Module):
             nn.SiLU(),
             nn.MaxPool2d(2, 2),  # -> (C*4, 8, 8)
             ResidualBlock(C*4),
+            ResidualBlock(C*4),
         )
 
         self.stage4 = nn.Sequential(
@@ -99,14 +103,16 @@ class EnhancedHandGestureCNN(nn.Module):
             nn.BatchNorm2d(C*8),
             nn.SiLU(),
             ResidualBlock(C*8),
+            ResidualBlock(C*8),
             nn.AdaptiveAvgPool2d((1, 1))  # -> (C*8, 1, 1)
         )
 
         self.classifier = nn.Sequential(
             nn.Flatten(),
-            nn.Dropout(0.5),
-            nn.Linear(C*8, 256),
+            nn.Linear(C*16, 256),
             nn.SiLU(),
+            # key fix, should dropout after first full connection layer and after the activation layer
+            nn.Dropout(0.5),
             nn.Linear(256, num_classes)
         )
 

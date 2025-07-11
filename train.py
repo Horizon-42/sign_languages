@@ -23,9 +23,9 @@ if not os.path.exists('runs'):
 
 # --- 1. Config Arguments ---
 NUM_CLASSES = 24
-BATCH_SIZE = 320
+BATCH_SIZE = 160
 NUM_EPOCHS = 100
-LEARNING_RATE = 0.005
+LEARNING_RATE = 0.01
 TRAIN_DIR = get_next_dir('runs')  # get the dir for new training
 IMAGE_SIZE = 64
 
