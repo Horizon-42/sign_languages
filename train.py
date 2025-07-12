@@ -25,7 +25,7 @@ if not os.path.exists('runs'):
 NUM_CLASSES = 24
 BATCH_SIZE = 160
 NUM_EPOCHS = 100
-LEARNING_RATE = 0.01
+LEARNING_RATE = 0.001
 TRAIN_DIR = get_next_dir('runs')  # get the dir for new training
 IMAGE_SIZE = 64
 
@@ -58,13 +58,13 @@ transform = v2.Compose(
         v2.ToImage(),                                 # convert tensor to image
         # random change brightness, contrast, and saturation
         # change the brightness and contrast
-        v2.ColorJitter(brightness=0.5, contrast=0.5),
+        # v2.ColorJitter(brightness=0.5, contrast=0.5),
         v2.Resize((IMAGE_SIZE, IMAGE_SIZE)),          # resize
         # enhance contrast, nonlinear
-        v2.RandomEqualize(p=0.8),
-        v2.RandomAffine(
-            degrees=20,                               # random rotation
-        ),
+        # v2.RandomEqualize(p=0.8),
+        # v2.RandomAffine(
+        #     degrees=20,                               # random rotation
+        # ),
         v2.ToDtype(torch.float32, scale=True),        # convert to tensenor
     ]
 )
